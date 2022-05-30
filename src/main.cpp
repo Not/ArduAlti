@@ -13,7 +13,7 @@
 #include <BuzzerPlayer.h>
 #include <Note.h>
 #include <ChargeState.h>
-
+#include <Button.h>
 
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
@@ -21,6 +21,8 @@ Adafruit_BMP280 bmp; // I2C
 BuzzerPlayer player;
 Ewma alt_filter(ALT_FILTER);
 Ewma spd_filter(SPD_FILTER);
+
+Button btns[] = {Button(6), Button(3), Button(2)};
 
 
 void display_temp(float temp){
@@ -110,6 +112,10 @@ void setup() {
   display.setFont(&TomThumb);
   display.setTextColor(SSD1306_WHITE ); // Draw white text
 
+  for (auto btn: btns){
+    btn.setup();
+  }
+
   for (int i=0;i<3;i++){
     player.add_note(Note(i*100+100, 100, 100));
   }
@@ -144,24 +150,34 @@ void loop() {
   int freq = mapfloat(filtered_spd, MIN_CLIMB_SPD, MAX_CLIMB_SPD, MIN_CLIMB_FREQ, MAX_CLIMB_FREQ);
   int dur = (int)mapfloat(filtered_spd, MIN_CLIMB_SPD, MAX_CLIMB_SPD, 150, 70);
   if (filtered_spd > MIN_CLIMB_SPD) player.add_instant_note(Note(freq, dur, dur));
-  player.run();
+  //player.run();
 
   //Battery
   int measured_voltage = map(VOLTAGE_DIVIDOR*analogRead(VOLTAGE_PIN), 0, 1024, 0, 3300);
   ChargeState charge_state = ChargeState();
   charge_state.set_from_measured_voltage(measured_voltage);
   
+  //Buttons
+  
+
+
 
 
   //Display about 29ms
   if(i%LCD_LOOP_SKIP==0){
+    display.clearDisplay();
+    display.setCursor(80,40);
 
+    display.print(btns[0].check_pressed());
+    display.print(btns[1].check_pressed());
+    display.print(btns[2].check_pressed());
 
     display_spd_gauge(filtered_spd);
     display_spd(filtered_spd);
     display_temp(temp);
     display_battery(charge_state);
     display_alt(filtered_alt);
+
 
   }
 

@@ -24,10 +24,15 @@
 #define MAX_DROP_SPD 0.5
 
 #define LOOP_HZ 50
-#define LCD_LOOP_SKIP 1
+#define LCD_LOOP_SKIP 10
 
 #define VOLTAGES_LEVELS {4150, 4110, 4080, 4020, 3980, 3950, 3910, 3870, 3850, 3840, 3820, 3800, 3790, 3770, 3750, 3730, 3710, 3690, 3610, 3300}
 #define DIODE_VOLTAGE_DROP 350
+
+  #define _LCDML_DISP_cols  20
+  #define _LCDML_DISP_rows  5
+  #define _LCDML_DSIP_use_header 0
+
 
 
 

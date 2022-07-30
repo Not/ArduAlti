@@ -1,10 +1,15 @@
+//#define XIAO_SAMD
+#define XIAO_RP
+
 #include <Arduino.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <Fonts/TomThumb.h>
 #include <Fonts/FreeSans18pt7b.h>
-#include <Tone.h>
+#ifdef XIAO_SAMD
+  #include <Tone.h>
+#endif
 #include <Queue.h>
 #include <Ewma.h>
 
@@ -21,8 +26,11 @@ Adafruit_BMP280 bmp; // I2C
 BuzzerPlayer player;
 Ewma alt_filter(ALT_FILTER);
 Ewma spd_filter(SPD_FILTER);
-
-Button btns[] = {Button(6), Button(3), Button(2)};
+#ifdef XIAO_SAMD
+  Button btns[] = {Button(6), Button(3), Button(2)};
+#else
+  Button btns[] = {Button(D6), Button(D3), Button(D2)};
+#endif
 
 
 void display_temp(float temp){
@@ -103,18 +111,20 @@ void setup() {
           Serial.println(F("SSD1306 allocation failed"));
     }
   }
+  Serial.println(F("SSD1306 CONNECTED"));
 
   if(bmp.begin(BMP280_ADDRESS_ALT)){
+    Serial.println(F("BMP CONNECTED"));
   }
 
   display.setTextSize(1);      // Normal 1:1 pixel scale
-  display.setRotation(2);
+  //display.setRotation(2);
   display.setFont(&TomThumb);
   display.setTextColor(SSD1306_WHITE ); // Draw white text
 
-  for (auto btn: btns){
-    btn.setup();
-  }
+  btns[0].setup();
+  btns[1].setup();
+  btns[2].setup();
 
   for (int i=0;i<3;i++){
     player.add_note(Note(i*100+100, 100, 100));
@@ -150,7 +160,7 @@ void loop() {
   int freq = mapfloat(filtered_spd, MIN_CLIMB_SPD, MAX_CLIMB_SPD, MIN_CLIMB_FREQ, MAX_CLIMB_FREQ);
   int dur = (int)mapfloat(filtered_spd, MIN_CLIMB_SPD, MAX_CLIMB_SPD, 150, 70);
   if (filtered_spd > MIN_CLIMB_SPD) player.add_instant_note(Note(freq, dur, dur));
-  //player.run();
+  player.run();
 
   //Battery
   int measured_voltage = map(VOLTAGE_DIVIDOR*analogRead(VOLTAGE_PIN), 0, 1024, 0, 3300);
@@ -159,10 +169,6 @@ void loop() {
   
   //Buttons
   
-
-
-
-
   //Display about 29ms
   if(i%LCD_LOOP_SKIP==0){
     display.clearDisplay();
@@ -177,8 +183,6 @@ void loop() {
     display_temp(temp);
     display_battery(charge_state);
     display_alt(filtered_alt);
-
-
   }
 
   Serial.print(filtered_spd);
@@ -190,6 +194,4 @@ void loop() {
   delay(max(desired_loop_time_ms-(millis()-loop_start_time),0));
 
   i++;
-
-
 }

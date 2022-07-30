@@ -3,8 +3,13 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-#define BUZZER_PIN 0
-#define VOLTAGE_PIN 10
+#ifdef XIAO_SAMD
+  #define BUZZER_PIN 0
+  #define VOLTAGE_PIN 10
+#else
+  #define BUZZER_PIN D0
+  #define VOLTAGE_PIN D10
+#endif
 #define VOLTAGE_DIVIDOR 2
 
 #define DEBUGln(x) Serial.println((x))

@@ -19,11 +19,14 @@
 #include <Note.h>
 #include <ChargeState.h>
 #include <Button.h>
+#include <VarioParams.h>
+#include <EEPROM.h>
 
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 Adafruit_BMP280 bmp; // I2C
 BuzzerPlayer player;
+VarioParams params;
 Ewma alt_filter(ALT_FILTER);
 Ewma spd_filter(SPD_FILTER);
 #ifdef XIAO_SAMD
@@ -32,6 +35,45 @@ Ewma spd_filter(SPD_FILTER);
   Button btns[] = {Button(D6), Button(D3), Button(D2)};
 #endif
 
+VarioParams get_default_params(){
+  VarioParams p;
+  p.a_rate=-5.0;
+  p.a_pitch=150;
+  p.b_rate=-2.0;
+  p.b_pitch=250;
+  p.c_rate=0.25;
+  p.c_pitch=250;
+  p.c_period=150;
+  p.d_rate=1.0; // 5.0
+  p.d_pitch=1000;
+  p.d_period=70;
+  p.max_rate_lcd=1.0;
+  p.min_rate_lcd=-1.0;
+  return p;
+}
+VarioParams read_params_from_eeprom(){
+  VarioParams p;
+  uint8_t *bytePtr = (uint8_t*)&p;
+  for(int i=0; i<sizeof(p);i++){
+   *(bytePtr+i)=EEPROM.read(i);
+  }
+  return p;
+}
+
+bool write_params_to_eeprom(VarioParams p){
+  uint8_t *bytePtr = (uint8_t*)&p;
+  for(int i=0; i<sizeof(p);i++){
+   EEPROM.write(i,*(bytePtr+i));
+  }
+  if (EEPROM.commit()) {
+   Serial.println("EEPROM successfully committed");
+   return true;
+  } else {
+    Serial.println("ERROR! EEPROM commit failed");
+    return false;
+  }
+
+}
 
 void display_temp(float temp){
     display.setFont(&TomThumb);
@@ -73,25 +115,26 @@ void display_spd(float speed){
 }
 
 void display_spd_gauge(float speed){
-    int gauge_width = 18;
-    int gauge_height = 54;
+    u_int8_t gauge_width = 18;
+    u_int8_t gauge_height = 63;
+    u_int8_t gauge_half = gauge_height/2;
     display.drawRoundRect(0,0,gauge_width,gauge_height,3, SSD1306_WHITE);
-    display.drawFastHLine(5,26,7,SSD1306_WHITE); // parametrize 5, h/2, w-2*5
+    display.drawFastHLine(5,gauge_half,gauge_width-2*5,SSD1306_WHITE); // parametrize 5, h/2, w-2*5
     display.setFont(&TomThumb);
     display.setCursor(5, 7); 
     display.setTextColor(SSD1306_WHITE);
-    display.print(MAX_CLIMB_SPD,1);
+    display.print(params.max_rate_lcd,1);
 
     display.setCursor(5, gauge_height-2); 
-    display.print(MAX_DROP_SPD,1);
+    display.print(-params.min_rate_lcd,1);
 
     if(speed > 0){
-      u_int8_t bar_height = (int)mapfloat(speed, 0, MAX_CLIMB_SPD, 0, 25);
-      display.fillRect(0, 26-bar_height, gauge_width, bar_height, SSD1306_WHITE);
+      u_int8_t bar_height = (int)mapfloat(speed, 0, params.max_rate_lcd, 0, gauge_half-2, true);
+      display.fillRect(0, gauge_half-bar_height, gauge_width, bar_height, SSD1306_WHITE);
     }
     else{
-      u_int8_t bar_height = (int)mapfloat(-speed, 0, MAX_DROP_SPD, 0, 25);
-      display.fillRect(0,27, gauge_width, bar_height-1, SSD1306_WHITE);
+      u_int8_t bar_height = (int)mapfloat(-speed, 0, -params.min_rate_lcd, 0, gauge_half-2, true);
+      display.fillRect(0,gauge_half+1, gauge_width, bar_height-1, SSD1306_WHITE);
     }
 }
 
@@ -116,6 +159,7 @@ void setup() {
   if(bmp.begin(BMP280_ADDRESS_ALT)){
     Serial.println(F("BMP CONNECTED"));
   }
+  EEPROM.begin(512);
 
   display.setTextSize(1);      // Normal 1:1 pixel scale
   //display.setRotation(2);
@@ -129,6 +173,13 @@ void setup() {
   for (int i=0;i<3;i++){
     player.add_note(Note(i*100+100, 100, 100));
   }
+  params = get_default_params();
+  //write_params_to_eeprom(params);
+  //params = read_params_from_eeprom();
+  delay(5000);
+  print_params(params);
+  delay(3000);
+  
 }
 
 float prev_filtered_alt = 0;
@@ -156,10 +207,17 @@ void loop() {
   prev_spd_time=millis();
   prev_filtered_alt = filtered_alt;
 
+  
   //Sound
-  int freq = mapfloat(filtered_spd, MIN_CLIMB_SPD, MAX_CLIMB_SPD, MIN_CLIMB_FREQ, MAX_CLIMB_FREQ);
-  int dur = (int)mapfloat(filtered_spd, MIN_CLIMB_SPD, MAX_CLIMB_SPD, 150, 70);
-  if (filtered_spd > MIN_CLIMB_SPD) player.add_instant_note(Note(freq, dur, dur));
+  if(filtered_spd>params.c_rate){ 
+    int freq = mapfloat(filtered_spd, params.c_rate, params.d_rate, params.c_pitch, params.d_pitch, true);
+    int dur = (int)mapfloat(filtered_spd, params.c_rate, params.d_rate, params.c_period, params.d_period, true);
+    player.add_instant_note(Note(freq, dur, dur));
+  }
+  if(filtered_spd<params.b_rate){
+    int freq = mapfloat(filtered_spd, params.a_rate, params.b_rate, params.a_pitch, params.b_pitch, true);
+    player.add_instant_note(Note(freq, 30, 0));
+  }
   player.run();
 
   //Battery

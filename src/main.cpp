@@ -44,7 +44,7 @@ VarioParams get_default_params(){
   p.c_rate=0.25;
   p.c_pitch=250;
   p.c_period=150;
-  p.d_rate=1.0; // 5.0
+  p.d_rate=5.0;
   p.d_pitch=1000;
   p.d_period=70;
   p.max_rate_lcd=1.0;
@@ -99,15 +99,15 @@ void display_battery(ChargeState charge_state){
 }
 
 void display_spd(float speed){
-    display.setCursor(30, 31);
+    display.setCursor(25, 26);
     display.setFont(&FreeSans18pt7b);
 
     if (speed>CLIMB_LCD_DEADZONE){
-        display.fillRoundRect(30,5,48,30,3,SSD1306_WHITE);
+        display.fillRoundRect(25,0,48,30,3,SSD1306_WHITE);
         display.setTextColor(SSD1306_BLACK);
     }
     else{
-        display.drawRoundRect(30,5,48,30,3,SSD1306_WHITE);
+        display.drawRoundRect(25,0,48,30,3,SSD1306_WHITE);
         display.setTextColor(SSD1306_WHITE);
     }
 
@@ -176,10 +176,7 @@ void setup() {
   params = get_default_params();
   //write_params_to_eeprom(params);
   //params = read_params_from_eeprom();
-  delay(5000);
   print_params(params);
-  delay(3000);
-  
 }
 
 float prev_filtered_alt = 0;
@@ -207,7 +204,6 @@ void loop() {
   prev_spd_time=millis();
   prev_filtered_alt = filtered_alt;
 
-  
   //Sound
   if(filtered_spd>params.c_rate){ 
     int freq = mapfloat(filtered_spd, params.c_rate, params.d_rate, params.c_pitch, params.d_pitch, true);
@@ -218,7 +214,7 @@ void loop() {
     int freq = mapfloat(filtered_spd, params.a_rate, params.b_rate, params.a_pitch, params.b_pitch, true);
     player.add_instant_note(Note(freq, 30, 0));
   }
-  player.run();
+  //player.run();
 
   //Battery
   int measured_voltage = map(VOLTAGE_DIVIDOR*analogRead(VOLTAGE_PIN), 0, 1024, 0, 3300);

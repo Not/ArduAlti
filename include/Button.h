@@ -14,13 +14,20 @@
 
 class Button {
 public:
-	enum button_press {
-		NOT_PRESSED=0,
-		PRESSED=1,
-		LONG_PRESSED=2,
+	enum pressed_time_outcome {
+		TOO_SHORT=0,
+		SHORT=1,
+		LONG=2,
+        PRESSED=4,
 	};
     
 	 Button(uint8_t _pin): pin{_pin}{}
+
+
+	unsigned long int button_down_timestamp;
+	bool state;
+	const uint8_t  pin;
+    unsigned long int pressed_time=0;
 
 	int setup(){
 		pinMode(pin, INPUT_PULLUP);
@@ -29,33 +36,44 @@ public:
 	}
 	int check_pressed() {
 		bool prev_state = state;
-		unsigned long int current_time = millis();
-		read();
-		if (state == LOW && prev_state == HIGH) {
-			button_down_time = current_time;
+		unsigned long int current_timestamp = millis();
+		
+		update_state();
+		if(state == LOW){
+			if(prev_state == HIGH){
+				button_down_timestamp = current_timestamp;
+                Serial.print(pin ); Serial.println(" pressed");
+			}
+			pressed_time = current_timestamp-button_down_timestamp;
+            return PRESSED;
+		}
+		 if (state == HIGH && prev_state == LOW) {
+			//button released
+            //Serial.print("button "); Serial.print(pin ); Serial.print(" was pressed for "); Serial.println(pressed_time);
 
-		} else if (state == HIGH && prev_state == LOW) {
-
-			if (current_time - button_down_time < MIN_PRESS_TIME) {
-				return NOT_PRESSED;
-			} else if (current_time - button_down_time < MIN_LONG_PRESS_TIME) {
+			if (pressed_time < MIN_PRESS_TIME) {
+				pressed_time=0;
+				return TOO_SHORT;
+			} else if (pressed_time < MIN_LONG_PRESS_TIME) {
 				//short click
-				return PRESSED;
-			} else if (current_time - button_down_time < 1500) {
+				pressed_time=0;
+				return SHORT;
+			} else if (pressed_time < 3000) {
+               // Serial.println("LONG");
+				pressed_time=0;
 				//long click
-				return LONG_PRESSED;
+				return LONG;
 			}
 
 		}
 		return 0;
 	}
-	bool read(){
+	bool update_state(){
 		state = digitalRead(pin);
 		return state;
 	}
-	unsigned long int button_down_time;
-	bool state;
-	const uint8_t  pin;
+
 };
 
 #endif /* BUTTON_H_ */
+

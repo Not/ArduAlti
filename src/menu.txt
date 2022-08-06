@@ -1,0 +1,24 @@
+ROOT
+    Mute ON/OFF;
+    Curve edit
+        Information
+        point A
+            Rate
+            Frequency
+            Pitch
+        point B
+            ...
+        point C
+            ...
+        point D
+            ...
+    Alt calibration
+        set current alt 0-3000
+        set ref pressure
+        zero alt
+    Filter level
+        alt 0.00  - 0.5
+        spd
+
+
+            

@@ -20,6 +20,7 @@
 #define SPD_FILTER 0.05
 #define CALIBRATION_TIME 3000
 
+//DEPRECATED
 #define MIN_CLIMB_SPD 0.28
 #define MIN_CLIMB_FREQ 250
 #define MAX_CLIMB_SPD 1.0
@@ -27,6 +28,7 @@
 #define CLIMB_LCD_DEADZONE 0.15
 
 #define MAX_DROP_SPD 0.5
+//END
 
 #define LOOP_HZ 50
 #define LCD_LOOP_SKIP 1
@@ -35,6 +37,9 @@
 #define DIODE_VOLTAGE_DROP 350
 
 
+  #define _LCDML_DISP_cols  20
+  #define _LCDML_DISP_rows  5
+  #define _LCDML_DSIP_use_header 0
 
 
 float mapfloat(float x, float in_min, float in_max, float out_min, float out_max, bool constrain=false)

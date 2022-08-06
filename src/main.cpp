@@ -32,7 +32,7 @@ Ewma spd_filter(SPD_FILTER);
 #ifdef XIAO_SAMD
   Button btns[] = {Button(6), Button(3), Button(2)};
 #else
-  Button btns[] = {Button(D6), Button(D3), Button(D2)};
+  Button btns[] = {Button(D1), Button(D2), Button(D6)};
 #endif
 
 VarioParams get_default_params(){
@@ -221,7 +221,6 @@ void loop() {
   ChargeState charge_state = ChargeState();
   charge_state.set_from_measured_voltage(measured_voltage);
   
-  //Buttons
   
   //Display about 29ms
   if(i%LCD_LOOP_SKIP==0){

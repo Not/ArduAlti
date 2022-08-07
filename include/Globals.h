@@ -1,3 +1,9 @@
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_GFX.h>
+#include <VarioParams.h>
+#include <Ewma.h>
+#include <BuzzerPlayer.h>
+
 #ifndef GLOBALS_H
 #define GLOBALS_H
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -8,26 +14,19 @@
   #define VOLTAGE_PIN 10
 #else
   #define BUZZER_PIN D0
-  #define VOLTAGE_PIN D10
+  #define VOLTAGE_PIN D3
 #endif
 #define VOLTAGE_DIVIDOR 2
 
 #define DEBUGln(x) Serial.println((x))
 #define DEBUG(x) Serial.print((x))
 
-#define ZERO_LEVEL_PRESSURE 1015.0
-#define ALT_FILTER 0.05
-#define SPD_FILTER 0.05
-#define CALIBRATION_TIME 3000
 
-//DEPRECATED
-#define MIN_CLIMB_SPD 0.28
-#define MIN_CLIMB_FREQ 250
-#define MAX_CLIMB_SPD 1.0
-#define MAX_CLIMB_FREQ 300
+#define CALIBRATION_TIME 2000
 #define CLIMB_LCD_DEADZONE 0.15
 
-#define MAX_DROP_SPD 0.5
+
+
 //END
 
 #define LOOP_HZ 50
@@ -37,15 +36,16 @@
 #define DIODE_VOLTAGE_DROP 350
 
 
-  #define _LCDML_DISP_cols  20
-  #define _LCDML_DISP_rows  5
-  #define _LCDML_DSIP_use_header 0
+extern Adafruit_SSD1306 display;
+extern VarioParams params;
+extern Ewma spd_filter;
+extern Ewma alt_filter;
+extern bool show_menu;
+extern bool sound_on;
+extern float sea_level_hpa;
+extern float filtered_alt;
 
 
-float mapfloat(float x, float in_min, float in_max, float out_min, float out_max, bool constrain=false)
-{
-  if (constrain) x=constrain(x,in_min,in_max);
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
+
 
 #endif

@@ -19,6 +19,7 @@ public:
 		SHORT=1,
 		LONG=2,
         PRESSED=4,
+		NOT_PRESSED=8,
 	};
     
 	 Button(uint8_t _pin): pin{_pin}{}
@@ -59,14 +60,14 @@ public:
 				pressed_time=0;
 				return SHORT;
 			} else if (pressed_time < 3000) {
-               // Serial.println("LONG");
+                Serial.println("LONG");
 				pressed_time=0;
 				//long click
 				return LONG;
 			}
 
 		}
-		return 0;
+		return NOT_PRESSED;
 	}
 	bool update_state(){
 		state = digitalRead(pin);

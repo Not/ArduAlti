@@ -32,7 +32,6 @@ VarioParams params;
 Ewma alt_filter(0.05);
 Ewma spd_filter(0.05);
 bool sound_on = true;
-float sea_level_hpa=1013.25;
 float filtered_alt=0;
 #ifdef XIAO_SAMD
   Button btns[] = {Button(6), Button(3), Button(2)};
@@ -132,6 +131,7 @@ VarioParams get_default_params(){
   p.min_rate_lcd=-1.0;
   p.rate_filter=0.05;
   p.alt_filter=0.05;
+  p.sea_level_hpa=1013.25;
   return p;
 }
 VarioParams read_params_from_eeprom(){
@@ -173,9 +173,11 @@ void display_temp(float temp){
 void display_battery(ChargeState charge_state){
       display.drawRect(SCREEN_WIDTH-12, 0, 12, 5, SSD1306_WHITE);
     display.drawFastVLine(115, 1, 3, SSD1306_WHITE); 
+    display.setFont(&TomThumb);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(95,13);
+    display.print(charge_state.battery_voltage_ms,1);
     if(charge_state.charging){
-      display.setFont(&TomThumb);
-      display.setTextColor(SSD1306_WHITE);
       display.setCursor(SCREEN_WIDTH-17, 5);
       display.print("+");
       display.drawFastHLine(SCREEN_WIDTH-10,2,8,SSD1306_WHITE);
@@ -196,6 +198,13 @@ void display_time(long time_ms){
     char buffer[6]={};
     get_time(buffer, time_ms);
     display.print(buffer);
+    display.drawRoundRect(22,13,65,12,3,SSD1306_WHITE);
+}
+
+void display_pressure(float pressure){
+    display.setFont();
+    display.setCursor(32,15);
+    display.print(pressure/100,2);
     display.drawRoundRect(22,13,65,12,3,SSD1306_WHITE);
 }
 
@@ -294,11 +303,12 @@ void loop() {
 
   //Temperature
   float temp =  bmp.readTemperature();
-
+  //Pressure
+  //float raw_pressure = bmp.readPressure();
   //Altitude
   float raw_alt = 0;
   while(true){
-    raw_alt =  bmp.readAltitude(sea_level_hpa);
+    raw_alt =  bmp.readAltitude(params.sea_level_hpa);
     if (abs(raw_alt)<20000) break; else Serial.println("read failed");
   }
   filtered_alt = alt_filter.filter(raw_alt);
@@ -330,6 +340,7 @@ void loop() {
   int measured_voltage = map(VOLTAGE_DIVIDOR*analogRead(VOLTAGE_PIN), 0, 1024, 0, 3300);
   ChargeState charge_state = ChargeState();
   charge_state.set_from_measured_voltage(measured_voltage);
+  charge_state.print(&Serial);
 
   if (btns[2].check_pressed()==2){
     timer_reset_ts = current_time;
@@ -366,6 +377,7 @@ void loop() {
       display_battery(charge_state);
       display_alt(filtered_alt);
       display_time(current_time-timer_reset_ts);
+      //display_pressure(raw_pressure);
     }
 
     Serial.print(measured_voltage);

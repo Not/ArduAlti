@@ -8,7 +8,39 @@ void write_params_to_eeprom(VarioParams p);
 VarioParams get_default_params();
 extern BuzzerPlayer player;
 
+void mDyn_any_float(uint8_t line, float increment, float * value, char * description){
+  bool active = (line == LCDML.MENU_getCursorPos());
+  if (active)
+  {
+    if(LCDML.BT_checkAny())
+    {
+      // This check have only an effect when MENU_disScroll is set
+      if(LCDML.BT_checkUp())
+      {
 
+      (*value)+=increment;
+        LCDML.BT_resetUp();
+      }
+      if(LCDML.BT_checkDown())
+      {
+        (*value)-=increment;
+        LCDML.BT_resetDown();
+      }
+      if(LCDML.BT_checkEnter())
+      {
+        if(LCDML.MENU_getScrollDisableStatus() == 0) LCDML.MENU_disScroll();
+        else LCDML.MENU_enScroll();
+        LCDML.BT_resetEnter();
+      }
+    }
+  }
+ 
+  display.setCursor(6, _LCDML_ADAFRUIT_FONT_H * (line+_LCDML_DSIP_use_header));
+  display.print(description);
+  if (LCDML.MENU_getScrollDisableStatus() == 1 && active) display.print("<"); else display.print(" ");
+  display.print((*value));
+  if (LCDML.MENU_getScrollDisableStatus() == 1 && active) display.print(">"); else display.print(" ");
+}
 void mDyn_sound(uint8_t line)
 {
   char buf[20];
@@ -113,68 +145,11 @@ u_int32_t * get_period_for_a_point(char c){
     }
 }
 void mDyn_alt_filter(uint8_t line){
-     bool active = (line == LCDML.MENU_getCursorPos());
-  if (active)
-  {
-    
-    if(LCDML.BT_checkAny())
-    {
-      // This check have only an effect when MENU_disScroll is set
-      if(LCDML.BT_checkUp())
-      {
-        (params.alt_filter)+=0.01;
-        LCDML.BT_resetUp();
-      }
-      if(LCDML.BT_checkDown())
-      {
-        (params.alt_filter)-=0.01;
-        LCDML.BT_resetDown();
-      }
-      if(LCDML.BT_checkEnter())
-      {
-        if(LCDML.MENU_getScrollDisableStatus() == 0) LCDML.MENU_disScroll();
-        else LCDML.MENU_enScroll();
-        LCDML.BT_resetEnter();
-      }
-    }
-  }
- 
-  display.setCursor(6, _LCDML_ADAFRUIT_FONT_H * (line+_LCDML_DSIP_use_header));
-  display.print("alt ");
-  if (LCDML.MENU_getScrollDisableStatus() == 1 && active) display.print("<"); else display.print(" ");
-  display.print(params.alt_filter);
-  if (LCDML.MENU_getScrollDisableStatus() == 1 && active) display.print(">"); else display.print(" ");
+  mDyn_any_float(line,0.01,&params.alt_filter,(char*)"alt ");
 }
 
 void mDyn_rate_filter(uint8_t line){
-     bool active = (line == LCDML.MENU_getCursorPos());
-  if (active)
-  {
-    if(LCDML.BT_checkAny())
-    {
-      if(LCDML.BT_checkUp())
-      {
-        (params.rate_filter)+=0.01;
-        LCDML.BT_resetUp();
-      }
-      if(LCDML.BT_checkDown())
-      {
-        (params.rate_filter)-=0.01;
-        LCDML.BT_resetDown();
-      }
-      if(LCDML.BT_checkEnter())
-      {
-        if(LCDML.MENU_getScrollDisableStatus() == 0) LCDML.MENU_disScroll();
-        else LCDML.MENU_enScroll();
-        LCDML.BT_resetEnter();
-      }
-    }
-  }
-  display.setCursor(6, _LCDML_ADAFRUIT_FONT_H * (line+_LCDML_DSIP_use_header));
-  display.print("rate ");
-  if (LCDML.MENU_getScrollDisableStatus() == 1 && active) display.print("<"); else display.print(" ");
-  display.print(params.rate_filter);
-  if (LCDML.MENU_getScrollDisableStatus() == 1 && active) display.print(">"); else display.print(" ");
+  mDyn_any_float(line,0.01,&params.rate_filter,(char*)"rate ");
 }
 
 void mDyn_rate(uint8_t line)
@@ -298,38 +273,11 @@ void mDyn_period(uint8_t line)
 
 void mDyn_hpa(uint8_t line)
 {
+  //sound_on = false;
+  mDyn_any_float(line,0.05,&params.sea_level_hpa,(char*)"0m hPa ");
+  alt_filter.reset();
+  spd_filter.reset();
   
-  bool active = (line == LCDML.MENU_getCursorPos());
-  if (active)
-  {
-    if(LCDML.BT_checkAny())
-    {
-      // This check have only an effect when MENU_disScroll is set
-      if(LCDML.BT_checkUp())
-      {
-
-        sea_level_hpa+=0.5;
-        LCDML.BT_resetUp();
-      }
-      if(LCDML.BT_checkDown())
-      {
-        sea_level_hpa+=0.5;
-        LCDML.BT_resetDown();
-      }
-      if(LCDML.BT_checkEnter())
-      {
-        if(LCDML.MENU_getScrollDisableStatus() == 0) LCDML.MENU_disScroll();
-        else LCDML.MENU_enScroll();
-        LCDML.BT_resetEnter();
-      }
-    }
-  }
- 
-  display.setCursor(6, _LCDML_ADAFRUIT_FONT_H * (line+_LCDML_DSIP_use_header));
-  display.print("0m hPa ");
-  if (LCDML.MENU_getScrollDisableStatus() == 1 && active) display.print("<"); else display.print(" ");
-  display.print(sea_level_hpa);
-  if (LCDML.MENU_getScrollDisableStatus() == 1 && active) display.print(">"); else display.print(" ");
 }
 
 void mDyn_alt(uint8_t line)

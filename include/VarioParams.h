@@ -18,6 +18,7 @@ struct VarioParams{
   float max_rate_lcd;
   float rate_filter;
   float alt_filter;
+  float sea_level_hpa;
 };
 
 // void print_params(VarioParams p){

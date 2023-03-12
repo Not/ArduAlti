@@ -33,6 +33,7 @@ Ewma alt_filter(0.05);
 Ewma spd_filter(0.05);
 bool sound_on = true;
 float filtered_alt=0;
+uint8_t current_page = 0;
 #ifdef XIAO_SAMD
   Button btns[] = {Button(6), Button(3), Button(2)};
 #else
@@ -176,7 +177,7 @@ void display_battery(ChargeState charge_state){
     display.setFont(&TomThumb);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(95,13);
-    display.print(charge_state.battery_voltage_ms,1);
+    display.print(charge_state.battery_voltage_ms/1000.0,2);
     if(charge_state.charging){
       display.setCursor(SCREEN_WIDTH-17, 5);
       display.print("+");
@@ -222,6 +223,38 @@ void display_spd(float speed){
     }
 
     display.print(abs(speed),1);
+}
+void display_spd_full(float speed){
+    display.setCursor(0,62);
+    display.setTextSize(2);
+    display.setFont(&FreeSans24pt7b);
+
+    if (speed>CLIMB_LCD_DEADZONE){
+        display.fillScreen(SSD1306_WHITE);
+        display.setTextColor(SSD1306_BLACK);
+    }
+    else{
+        display.fillScreen(SSD1306_BLACK);
+        display.setTextColor(SSD1306_WHITE);
+    }
+
+    display.print(abs(speed),1);
+}
+
+void display_alt_full(float alt){
+    display.setCursor(0,40);
+    display.setTextSize(1);
+    display.setFont(&FreeSans24pt7b);
+    display.fillScreen(SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+    alt = alt;
+    if(alt>1000){
+      display.print((int)alt);
+    }else{
+    display.print(alt,1);
+    display.setFont();
+    display.print("m");
+    }
 }
 
 void display_spd_gauge(float speed){
@@ -321,7 +354,7 @@ void loop() {
   float raw_spd = 1000.0*alt_diff/delta;
   float filtered_spd = spd_filter.filter(raw_spd);
 
-  prev_spd_time=millis();
+  prev_spd_time=millis(); 
   prev_filtered_alt = filtered_alt;
 
   //Sound
@@ -355,6 +388,11 @@ void loop() {
       delay(200);
     }
   } 
+
+   if (btns[0].check_pressed()==2){
+    current_page++;
+    current_page = current_page % PG_COUNT;
+  }
   
   
   //Display about 29ms
@@ -370,14 +408,21 @@ void loop() {
       //display.print(btns[0].check_pressed());
       //display.print(btns[1].check_pressed());
       //display.print(btns[2].check_pressed());
-
-      display_spd_gauge(filtered_spd);
-      display_spd(filtered_spd);
-      display_temp(temp);
-      display_battery(charge_state);
-      display_alt(filtered_alt);
-      display_time(current_time-timer_reset_ts);
-      //display_pressure(raw_pressure);
+      // TODO change current_page to enum
+      if (current_page==0){
+        display.setTextSize(1);
+        display_spd_gauge(filtered_spd);
+        display_spd(filtered_spd);
+        display_temp(temp);
+        display_battery(charge_state);
+        display_alt(filtered_alt);
+        display_time(current_time-timer_reset_ts);
+        //display_pressure(raw_pressure);
+      } else if (current_page==1){
+        display_spd_full(filtered_spd);
+      } else if (current_page==2){
+        display_alt_full(filtered_alt);
+      }
     }
 
     Serial.print(measured_voltage);

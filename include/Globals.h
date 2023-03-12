@@ -25,6 +25,8 @@
 #define CALIBRATION_TIME 2000
 #define CLIMB_LCD_DEADZONE 0.15
 
+#define PG_COUNT 3
+
 
 
 //END

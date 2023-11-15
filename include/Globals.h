@@ -9,14 +9,8 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
-#ifdef XIAO_SAMD
-  #define BUZZER_PIN 0
-  #define VOLTAGE_PIN 10
-#else
-  #define BUZZER_PIN D0
-  #define VOLTAGE_PIN D3
-#endif
-#define VOLTAGE_DIVIDOR 2
+#define BUZZER_PIN D0
+
 
 #define DEBUGln(x) Serial.println((x))
 #define DEBUG(x) Serial.print((x))
@@ -29,11 +23,13 @@
 
 //END
 
-#define LOOP_HZ 50
-#define LCD_LOOP_SKIP 1
+#define LOOP_HZ 30
+#define LCD_LOOP_SKIP 5
+#define LCD_BATT_SKIP 5
 
 #define VOLTAGES_LEVELS {4150, 4110, 4080, 4020, 3980, 3950, 3910, 3870, 3850, 3840, 3820, 3800, 3790, 3770, 3750, 3730, 3710, 3690, 3610, 3300}
-#define DIODE_VOLTAGE_DROP 350
+#define PG_COUNT 3
+
 
 
 extern Adafruit_SSD1306 display;

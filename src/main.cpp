@@ -5,15 +5,16 @@
 #include <Adafruit_BMP280.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
 #include <Fonts/TomThumb.h>
 #include <Fonts/FreeSans18pt7b.h>
 #include <Fonts/FreeSans24pt7b.h>
 //#include <Numbers24pt.h>
-#include <EEPROM.h>
+
 #include <LCDMenuLib2.h>  
-#ifdef XIAO_SAMD
-  #include <Tone.h>
-#endif
+
+#include <Tone.h>
 #include <Queue.h>
 #include <Ewma.h>
 
@@ -26,20 +27,32 @@
 #include <menu_func.h>
 
 
+//XIAO nrf
+#include <bluefruit.h>
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
+
+using namespace Adafruit_LittleFS_Namespace;
+
+File file(InternalFS);
 Adafruit_BMP280 bmp; // I2C
 BuzzerPlayer player;
 VarioParams params;
 Ewma alt_filter(0.05);
 Ewma spd_filter(0.05);
+BLEDfu  bledfu;  // OTA DFU service
+BLEDis  bledis;  // device information
+BLEUart bleuart; // uart over ble
+BLEBas  blebas;  // battery
+ChargeState charge_state;
+uint8_t current_page = 0;
+
 bool sound_on = true;
 float sea_level_hpa=1013.25;
 float filtered_alt=0;
-#ifdef XIAO_SAMD
-  Button btns[] = {Button(6), Button(3), Button(2)};
-#else
-  Button btns[] = {Button(D6), Button(D2), Button(D1)};
-  //Button btns[] = {Button(D0), Button(D3), Button(D2)};
-#endif
+
+Button btns[] = {Button(D6), Button(D3), Button(D1)};
+
 
 Adafruit_SSD1306 display(128  , 64, &Wire, -1);
 
@@ -134,12 +147,24 @@ VarioParams get_default_params(){
   p.alt_filter=0.05;
   return p;
 }
+void print_params(VarioParams p){
+  Serial.println("VarioParams:");
+  Serial.print("\tc_rate ");Serial.println(p.c.rate);
+  Serial.print("\td_rate ");Serial.println(p.d.rate);
+  Serial.print("\tc_pitch ");Serial.println(p.c.pitch);
+  Serial.print("\td_pitch ");Serial.println(p.d.pitch);  
+}
 VarioParams read_params_from_eeprom(){
   VarioParams p;
   uint8_t *bytePtr = (uint8_t*)&p;
-  for(int i=0; i<sizeof(p);i++){
-   *(bytePtr+i)=EEPROM.read(i);
-  }
+  if(file.open("parms", FILE_O_READ)){
+      file.read(bytePtr, sizeof(p));
+      file.close();
+      Serial.println("Data succesfully read");
+    }
+    else{
+      Serial.println("File open failed");
+    } 
   return p;
 }
 
@@ -150,24 +175,25 @@ float mapfloat(float x, float in_min, float in_max, float out_min, float out_max
 }
 
 bool write_params_to_eeprom(VarioParams p){
-  uint8_t *bytePtr = (uint8_t*)&p;
-  for(int i=0; i<sizeof(p);i++){
-   EEPROM.write(i,*(bytePtr+i));
-  }
-  if (EEPROM.commit()) {
-   Serial.println("EEPROM successfully committed");
-   return true;
-  } else {
-    Serial.println("ERROR! EEPROM commit failed");
-    return false;
-  }
+    uint8_t *bytePtr = (uint8_t*)&p;
+    if(file.open("parms", FILE_O_WRITE)){
+      file.seek(0);
+      file.write(bytePtr, sizeof(p));
+      file.close();
+      Serial.println("Data succesfully saved");
+      return true;
+    }
+    else{
+      Serial.println("File open failed");
+      return false;
+    } 
 }
 
 void display_temp(float temp){
     display.setFont(&TomThumb);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(95,5);
-    display.print((int)temp-8);display.print("'C");
+    display.print((int)temp);display.print("'C");
 }
 
 void display_battery(ChargeState charge_state){
@@ -188,15 +214,37 @@ void display_battery(ChargeState charge_state){
 void get_time(char * buffer, long millis){
     int minutes = millis/60000;
     int seconds = millis/1000 - minutes*60;
-    sprintf(buffer, "%02d:%02d%c",minutes, seconds, '\0');
+    snprintf(buffer, 18,"%02d:%02d%c",minutes, seconds, '\0');
 }
+
 void display_time(long time_ms){
     display.setFont();
     display.setCursor(32,15);
-    char buffer[6]={};
+    char buffer[18]={};
     get_time(buffer, time_ms);
     display.print(buffer);
     display.drawRoundRect(22,13,65,12,3,SSD1306_WHITE);
+}
+
+void prepare_lk_frame(char* buf, float pressure, float alt, float speed, float temp, ChargeState charge_state, bool send_raw_pressure = false, bool send_raw_voltage = false ){
+    int prs = send_raw_pressure?(int)pressure*100:999999;
+    char bat[8] = {};
+    if (send_raw_voltage)
+        snprintf(bat, 8, "%.2f", charge_state.battery_voltage_mV/1000.);
+    else
+        snprintf(bat,8, "%d", charge_state.batter_percentage+1000);
+    int j = snprintf(buf, 64, "$LK8EX1,%d,%.2f,%d,%.1f,%s,*",prs, alt, (int)(speed*100), temp, bat);
+
+
+    int XOR = 0;
+
+    for (unsigned int i = 1; i < strlen(buf)-1; i++) {
+      char c = buf[i];
+      if (c == '*') {break;}
+      XOR ^= c;
+    }
+    sprintf(buf+j, "%X", XOR);
+
 }
 
 void display_spd(float speed){
@@ -213,6 +261,38 @@ void display_spd(float speed){
     }
 
     display.print(abs(speed),1);
+}
+	void display_spd_full(float speed){
+    display.setCursor(0,62);
+    display.setTextSize(2);
+    display.setFont(&FreeSans24pt7b);
+
+    if (speed>CLIMB_LCD_DEADZONE){
+        display.fillScreen(SSD1306_WHITE);
+        display.setTextColor(SSD1306_BLACK);
+    }
+    else{
+        display.fillScreen(SSD1306_BLACK);
+        display.setTextColor(SSD1306_WHITE);
+    }
+
+    display.print(abs(speed),1);
+}
+
+void display_alt_full(float alt){
+    display.setCursor(0,40);
+    display.setTextSize(1);
+    display.setFont(&FreeSans24pt7b);
+    display.fillScreen(SSD1306_WHITE);
+    display.setTextColor(SSD1306_BLACK);
+    alt = alt;
+    if(alt>1000){
+      display.print((int)alt);
+    }else{
+    display.print(alt,1);
+    display.setFont();
+    display.print("m");
+    }
 }
 
 void display_spd_gauge(float speed){
@@ -246,13 +326,81 @@ void display_alt(float altitude){
     display.drawRoundRect(22,0,65,12,3,SSD1306_WHITE);
 }
 
+void startAdv(void)
+{
+  // Advertising packet
+  Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+  Bluefruit.Advertising.addTxPower();
+
+  // Include bleuart 128-bit uuid
+  Bluefruit.Advertising.addService(bleuart);
+
+  // Secondary Scan Response packet (optional)
+  // Since there is no room for 'Name' in Advertising packet
+  Bluefruit.ScanResponse.addName();
+  Bluefruit.Advertising.restartOnDisconnect(true);
+  Bluefruit.Advertising.setInterval(32, 244);    // in unit of 0.625 ms
+  Bluefruit.Advertising.setFastTimeout(30);      // number of seconds in fast mode
+  Bluefruit.Advertising.start(0);                // 0 = Don't stop advertising after n seconds  
+}
+
+void connect_callback(uint16_t conn_handle)
+{
+  // Get the reference to current connection
+  BLEConnection* connection = Bluefruit.Connection(conn_handle);
+
+  char central_name[32] = { 0 };
+  connection->getPeerName(central_name, sizeof(central_name));
+
+  Serial.print("Connected to ");
+  Serial.println(central_name);
+}
+
+void disconnect_callback(uint16_t conn_handle, uint8_t reason)
+{
+  (void) conn_handle;
+  (void) reason;
+
+  Serial.println();
+  Serial.print("Disconnected, reason = 0x"); Serial.println(reason, HEX);
+}
+
+void setup_ble(){
+
+  Bluefruit.autoConnLed(true);
+  Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
+
+  Bluefruit.begin();
+  Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
+  //Bluefruit.setName(getMcuUniqueID()); // useful testing with multiple central connections
+  Bluefruit.Periph.setConnectCallback(connect_callback);
+  Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
+
+  bledfu.begin();
+
+  // Configure and Start Device Information Service
+  bledis.setManufacturer("KK");
+  bledis.setModel("ArduAlti V2 BLE");
+  bledis.begin();
+
+  // Configure and Start BLE Uart Service
+  bleuart.begin();
+
+  // Start BLE Battery Service
+  blebas.begin();
+  blebas.write(100);
+
+  // Set up and start advertising
+  startAdv();
+}
 
 
 void setup() {
+  setup_ble();
 
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
     while(true){
-          Serial.println(F("SSD1306 allocation failed"));
+          Serial.println(F("SSD1306 allocation failed"));     
     }
   }
   Serial.println(F("SSD1306 CONNECTED"));
@@ -260,23 +408,25 @@ void setup() {
   if(bmp.begin(BMP280_ADDRESS_ALT)){
     Serial.println(F("BMP CONNECTED"));
   }
-  EEPROM.begin(512);
+
+
+  InternalFS.begin();
 
   display.setTextSize(1);      // Normal 1:1 pixel scale
   //display.setRotation(2);
   display.setFont(&TomThumb);
   display.setTextColor(SSD1306_WHITE ); // Draw white text
-
+  charge_state.begin();
   btns[0].setup();
   btns[1].setup();
   btns[2].setup();
-
   for (int i=0;i<3;i++){
     player.add_note(Note(i*100+100, 100, 100));
   }
-  //params = get_default_params();
-  //write_params_to_eeprom(params);
+  // params = get_default_params();
+  // write_params_to_eeprom(params);
   params = read_params_from_eeprom();
+  print_params(params);
   alt_filter.alpha=params.alt_filter;
   spd_filter.alpha=params.rate_filter;
   LCDML_setup(_LCDML_DISP_cnt);
@@ -327,9 +477,9 @@ void loop() {
   player.run();
 
   //Battery
-  int measured_voltage = map(VOLTAGE_DIVIDOR*analogRead(VOLTAGE_PIN), 0, 1024, 0, 3300);
-  ChargeState charge_state = ChargeState();
-  charge_state.set_from_measured_voltage(measured_voltage);
+  if(i%LCD_BATT_SKIP==0){
+    charge_state.set_from_readings();
+  }
 
   if (btns[2].check_pressed()==2){
     timer_reset_ts = current_time;
@@ -359,21 +509,40 @@ void loop() {
       //display.print(btns[0].check_pressed());
       //display.print(btns[1].check_pressed());
       //display.print(btns[2].check_pressed());
-
-      display_spd_gauge(filtered_spd);
-      display_spd(filtered_spd);
-      display_temp(temp);
-      display_battery(charge_state);
-      display_alt(filtered_alt);
-      display_time(current_time-timer_reset_ts);
+      if (current_page==0){
+        display_spd_gauge(filtered_spd);
+        display_spd(filtered_spd);
+        display_temp(temp);
+        display_battery(charge_state);
+        display_alt(filtered_alt);
+        display_time(current_time-timer_reset_ts);
+      }
+      else if (current_page==1){
+        display_spd_full(filtered_spd);
+      }
+      
     }
+    charge_state.print(&Serial);
+    // Serial.print(filtered_alt);
+    // Serial.print(" ");
+    // Serial.print(filtered_spd);
+    // Serial.print(" ");
+    // Serial.print(charge_state.batter_percentage);
+    // Serial.print(" ");
+    // Serial.println(temp);
 
-    Serial.print(measured_voltage);
-    Serial.print(" ");
-    Serial.print(filtered_alt);
-    Serial.print(" ");
-    Serial.println(delta);
+    if (btns[0].check_pressed()==2){
+      current_page++;
+      current_page = current_page % PG_COUNT;
+    }
   }
+
+  //ble
+  char buf[100]={};
+  prepare_lk_frame(buf, 0, filtered_alt, filtered_spd, temp, charge_state);
+  bleuart.write(buf, strlen(buf));
+  bleuart.println();
+
   
 
   float desired_loop_time_ms = 1000/LOOP_HZ;

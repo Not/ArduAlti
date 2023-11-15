@@ -20,12 +20,5 @@ struct VarioParams{
   float alt_filter;
 };
 
-// void print_params(VarioParams p){
-//   Serial.println("VarioParams:");
-//   Serial.print("\tc_rate ");Serial.println(p.c_rate);
-//   Serial.print("\td_rate ");Serial.println(p.d_rate);
-//   Serial.print("\tc_pitch ");Serial.println(p.c_pitch);
-//   Serial.print("\td_pitch ");Serial.println(p.d_pitch);  
-// }
 #endif
 

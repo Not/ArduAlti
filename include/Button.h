@@ -4,7 +4,7 @@
  *  Created on: 5 lis 2019
  *      Author: c
  */
-#include <arduino.h>
+#include <Arduino.h>
 
 #ifndef BUTTON_H_
 #define BUTTON_H_
